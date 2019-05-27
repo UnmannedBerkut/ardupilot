@@ -48,6 +48,7 @@ public:
     void update_50hz(void);
 
     // Update the control loop calculations
+    // Called at 10Hz in autothrottle modes
     void update_pitch_throttle(int32_t hgt_dem_cm,
                                int32_t EAS_dem_cm,
                                enum AP_Vehicle::FixedWing::FlightStage flight_stage,

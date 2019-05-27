@@ -291,10 +291,15 @@ void AP_TECS::update_50hz(void)
     if (_ahrs.get_velocity_NED(velned)) {
         // if possible use the EKF vertical velocity
         _climb_rate = -velned.z;
+
+        //!!!!!!!!!!!!!!!!!!!!!!
+        //gcs().send_text(MAV_SEVERITY_INFO, "AHRS climb_rate:%8.2f, vel_dot:%8.2f",_climb_rate, _vel_dot);
+
     } else {
         /*
           use a complimentary filter to calculate climb_rate. This is
           designed to minimise lag
+          Note: this is only used when AHRS is unusable
          */
         const float baro_alt = AP::baro().get_altitude();
         // Get height acceleration
@@ -319,6 +324,10 @@ void AP_TECS::update_50hz(void)
         } else {
             _height_filter.height += integ3_input*DT;
         }
+
+        //!!!!!!!!!!!!!!!!!!!!!!
+        //gcs().send_text(MAV_SEVERITY_INFO, "climb_rate:%8.2f, vel_dot:%8.2f",_climb_rate, _vel_dot);
+
     }
 
     // Update and average speed rate of change
@@ -344,6 +353,9 @@ void AP_TECS::_update_speed(float load_factor)
     _TAS_dem = _EAS_dem * EAS2TAS;
     _TASmax   = aparm.airspeed_max * EAS2TAS;
     _TASmin   = aparm.airspeed_min * EAS2TAS;
+
+	//!!!!!!!!!!!!!!!!!!!!!
+	//gcs().send_text(MAV_SEVERITY_INFO, "Number of blahs is %u",(unsigned int)_TAS_dem);
 
     if (aparm.stall_prevention) {
         // when stall prevention is active we raise the mimimum
@@ -389,6 +401,8 @@ void AP_TECS::_update_speed(float load_factor)
     // limit the airspeed to a minimum of 3 m/s
     _TAS_state = MAX(_TAS_state, 3.0f);
 
+    //!!!!!!!!!!!!!!!!!!!!!
+    //gcs().send_text(MAV_SEVERITY_INFO, "Number of blahs is %8.2f",_TAS_state);
 }
 
 void AP_TECS::_update_speed_demand(void)
@@ -409,8 +423,10 @@ void AP_TECS::_update_speed_demand(void)
     // calculate velocity rate limits based on physical performance limits
     // provision to use a different rate limit if bad descent or underspeed condition exists
     // Use 50% of maximum energy rate to allow margin for total energy contgroller
-    const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
-    const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
+    //const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
+    //const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
+    const float velRateMax = 2.0f;	//m/s/s
+    const float velRateMin = -2.0f;	//m/s/s
     const float TAS_dem_previous = _TAS_dem_adj;
 
     // assume fixed 10Hz call rate
@@ -434,10 +450,17 @@ void AP_TECS::_update_speed_demand(void)
     }
     // Constrain speed demand again to protect against bad values on initialisation.
     _TAS_dem_adj = constrain_float(_TAS_dem_adj, _TASmin, _TASmax);
+
+    //gcs().send_text(MAV_SEVERITY_INFO, "vel_cmd:%8.2f, %d",_TAS_dem_adj);
 }
 
 void AP_TECS::_update_height_demand(void)
 {
+	//height demand can change instantly
+	gcs().send_text(MAV_SEVERITY_INFO, "alt_cmd:%8.2f",_hgt_dem);
+	_hgt_dem_adj = _hgt_dem;
+	return;
+
     // Apply 2 point moving average to demanded height
     _hgt_dem = 0.5f * (_hgt_dem + _hgt_dem_in_old);
     _hgt_dem_in_old = _hgt_dem;
@@ -970,6 +993,26 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Convert inputs
     _hgt_dem = hgt_dem_cm * 0.01f;
     _EAS_dem = EAS_dem_cm * 0.01f;
+
+    // Convert equivalent airspeeds to true airspeeds
+     float EAS2TAS = _ahrs.get_EAS2TAS();
+     _TAS_dem = _EAS_dem * EAS2TAS;
+     _TASmax   = aparm.airspeed_max * EAS2TAS;
+     _TASmin   = aparm.airspeed_min * EAS2TAS;
+
+     _throttle_dem = 0.5f;
+     _pitch_dem = 2.0f * DEG_TO_RAD;
+
+     // Update the speed estimate using a 2nd order complementary filter
+     _update_speed(load_factor);
+
+     _update_speed_demand();
+
+     //display working variables
+     gcs().send_text(MAV_SEVERITY_INFO, "spd: cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%4.1f",
+    		 _TAS_dem_adj, _TAS_state, _vel_dot, _pitch_dem*RAD_TO_DEG);
+
+     return;
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);
