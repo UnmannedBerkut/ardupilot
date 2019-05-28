@@ -1,0 +1,15 @@
+-Clone github.com project into a local directory /clone
+$ mkdir fork
+$ cd projectFork.git
+$ git init --bare
+$ cd /clone
+$ git push --all /projectFork.git
+$ git push --mirror /projectFork.git
+-in GitKracken clone into your working directory from projectFork.git
+-set the remote orgin to the orginal github.com project path, you should see the corresponding branches listed under origin
+-create another remote using the projectFork name pointing to the local repo for push/pull, you shold see the corresponding branches of your fork listed under projectFork
+-Fetching should fetch from both repos
+-pushing should only push to your repo
+
+
+

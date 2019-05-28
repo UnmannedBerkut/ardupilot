@@ -1000,17 +1000,25 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      _TASmax   = aparm.airspeed_max * EAS2TAS;
      _TASmin   = aparm.airspeed_min * EAS2TAS;
 
+     //!!!!!!!!!!!!!!!!!!!!!!!!
      _throttle_dem = 0.5f;
      _pitch_dem = 2.0f * DEG_TO_RAD;
 
-     // Update the speed estimate using a 2nd order complementary filter
-     _update_speed(load_factor);
+     //get speed
+     _ahrs.airspeed_estimate(&_EAS);
+     float TAS = _EAS * EAS2TAS;
 
      _update_speed_demand();
 
+     //Pitch Controller
+     float TAS_error = _TAS_dem_adj - TAS;
+     float P_gain = 2.0f;
+     float output = -(TAS_error * P_gain);
+     _pitch_dem = output * DEG_TO_RAD;
+
      //display working variables
      gcs().send_text(MAV_SEVERITY_INFO, "spd: cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%4.1f",
-    		 _TAS_dem_adj, _TAS_state, _vel_dot, _pitch_dem*RAD_TO_DEG);
+    		 _TAS_dem_adj, TAS, _vel_dot, _pitch_dem*RAD_TO_DEG);
 
      return;
 
