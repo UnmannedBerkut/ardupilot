@@ -238,7 +238,23 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Values: 0:Disable,1:Enable
     // @User: Advanced
     AP_GROUPINFO("SYNAIRSPEED", 27, AP_TECS, _use_synthetic_airspeed, 0),
-    
+
+    // @Param: SPEED_P
+    // @DisplayName: Speed Proportional Gain
+    // @Description: Speed Proportional Gain
+    // @Range: 0.1 100.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("SPEED_P", 28, AP_TECS, _speed_p, 0),
+
+    // @Param: SPEED_I
+    // @DisplayName: Speed Integral Gain
+    // @Description: Speed Integral Gain
+    // @Range: 0.1 100.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("SPEED_I", 29, AP_TECS, _speed_i, 0),
+
     AP_GROUPEND
 };
 
@@ -412,10 +428,11 @@ void AP_TECS::_update_speed_demand(void)
     // This will minimise the rate of descent resulting from an engine failure,
     // enable the maximum climb rate to be achieved and prevent continued full power descent
     // into the ground due to an unachievable airspeed value
-    if ((_flags.badDescent) || (_flags.underspeed))
-    {
-        _TAS_dem     = _TASmin;
-    }
+
+    //if ((_flags.badDescent) || (_flags.underspeed))
+    //{
+    //    _TAS_dem     = _TASmin;
+    //}
 
     // Constrain speed demand, taking into account the load factor
     _TAS_dem = constrain_float(_TAS_dem, _TASmin, _TASmax);
@@ -425,8 +442,8 @@ void AP_TECS::_update_speed_demand(void)
     // Use 50% of maximum energy rate to allow margin for total energy contgroller
     //const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
     //const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
-    const float velRateMax = 2.0f;	//m/s/s
-    const float velRateMin = -2.0f;	//m/s/s
+    const float velRateMax = 3.0f;	//m/s/s
+    const float velRateMin = -3.0f;	//m/s/s
     const float TAS_dem_previous = _TAS_dem_adj;
 
     // assume fixed 10Hz call rate
@@ -981,6 +998,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                                     float hgt_afe,
                                     float load_factor)
 {
+	static float _integ = 0.0f;
+
     // Calculate time in seconds since last update
     uint64_t now = AP_HAL::micros64();
     _DT = (now - _update_pitch_throttle_last_usec) * 1.0e-6f;
@@ -1002,18 +1021,25 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
      //!!!!!!!!!!!!!!!!!!!!!!!!
      _throttle_dem = 0.5f;
-     _pitch_dem = 2.0f * DEG_TO_RAD;
+     //_pitch_dem = 2.0f * DEG_TO_RAD;
 
      //get speed
      _ahrs.airspeed_estimate(&_EAS);
      float TAS = _EAS * EAS2TAS;
 
+     //Initialize TAS demand if the pitch/throttle controller has just been engaged (off for > 1s)
+     if (_DT > 1.0f)
+    	 _TAS_dem_adj = TAS;
+
      _update_speed_demand();
 
      //Pitch Controller
      float TAS_error = _TAS_dem_adj - TAS;
-     float P_gain = 2.0f;
-     float output = -(TAS_error * P_gain);
+     float P_gain = _speed_p;
+
+     _integ = _integ + TAS_error*_speed_i;
+
+     float output = -(TAS_error * P_gain + _integ);
      _pitch_dem = output * DEG_TO_RAD;
 
      //display working variables
@@ -1021,6 +1047,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     		 _TAS_dem_adj, TAS, _vel_dot, _pitch_dem*RAD_TO_DEG);
 
      return;
+
+
 
     // Update the speed estimate using a 2nd order complementary filter
     _update_speed(load_factor);
