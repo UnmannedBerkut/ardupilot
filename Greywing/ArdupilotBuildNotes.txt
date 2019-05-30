@@ -16,7 +16,7 @@ then see Build.md, but specifically:
 use board fmuv4 for the Pixracer board with ChibliOS:
 $ ./waf configure --board fmuv4 
 then
-$ ./waf --targets bin/arduplane --upload to porgram the board via USB (dont forget the dialout permission fix)
+$ ./waf --targets bin/arduplane --upload to program the board via USB (dont forget the dialout permission fix)
 
 building and running the software in the loop sim
 from /ardupilot do:
