@@ -54,6 +54,11 @@ start sim:
 $ cd /ardupilot/ArduPlane
 $ ../Tools/autotest/sim_vehicle.py -D --custom-location=32.70119,-117.25411,40,0
 
+Advanced Usage:
+-start simulator using a flying wing model. Note that this will also automatically rconfigure the autopilot nonvolatile parameters to use elevons
+../Tools/autotest/sim_vehicle.py -D --custom-location=32.70119,-117.25411,40,0 --frame=plane-elevon
+
+
 
 
 
