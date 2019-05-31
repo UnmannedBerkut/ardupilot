@@ -1043,8 +1043,11 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      _pitch_dem = output * DEG_TO_RAD;
 
      //display working variables
-     gcs().send_text(MAV_SEVERITY_INFO, "spd: cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%4.1f",
-    		 _TAS_dem_adj, TAS, _vel_dot, _pitch_dem*RAD_TO_DEG);
+     //gcs().send_text(MAV_SEVERITY_INFO, "spd: cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%4.1f",
+    	//	 _TAS_dem_adj, TAS, _vel_dot, _pitch_dem*RAD_TO_DEG);
+     gcs().send_text(MAV_SEVERITY_INFO, "cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%1.1f",
+    		 _hgt_dem, _height, _climb_rate, _throttle_dem);
+
 
      return;
 
