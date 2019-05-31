@@ -1019,6 +1019,10 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      _TASmax   = aparm.airspeed_max * EAS2TAS;
      _TASmin   = aparm.airspeed_min * EAS2TAS;
 
+     //calculate pitch limits
+     _PITCHmaxf = aparm.pitch_limit_max_cd * 0.01f;
+     _PITCHminf = aparm.pitch_limit_min_cd * 0.01f;
+
      //!!!!!!!!!!!!!!!!!!!!!!!!
      _throttle_dem = 0.5f;
      //_pitch_dem = 2.0f * DEG_TO_RAD;
@@ -1027,9 +1031,12 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      _ahrs.airspeed_estimate(&_EAS);
      float TAS = _EAS * EAS2TAS;
 
-     //Initialize TAS demand if the pitch/throttle controller has just been engaged (off for > 1s)
-     if (_DT > 1.0f)
+     //Initialize TAS demand and integrator if the pitch/throttle controller has just been engaged (off for > 0.5s)
+     if (_DT > 0.5f)
+     {
     	 _TAS_dem_adj = TAS;
+    	 _integ = _ahrs.pitch_sensor/100.0f;
+     }
 
      _update_speed_demand();
 
@@ -1039,14 +1046,19 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
      _integ = _integ + TAS_error*_speed_i;
 
+     //Limit integrator wind-up to max/min pitch command limits
+     //Note: Contribution from the P gain can drive _pitch_dem (a few degrees) outside of pitch limits
+     //This is ok for now as the line below prevents integrator wind-up and the pitch controller prevents the actual command from exceed limits
+     _integ = constrain_float(_integ, _PITCHminf, _PITCHmaxf);
+
      float output = -(TAS_error * P_gain + _integ);
      _pitch_dem = output * DEG_TO_RAD;
 
      //display working variables
-     //gcs().send_text(MAV_SEVERITY_INFO, "spd: cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%4.1f",
-    	//	 _TAS_dem_adj, TAS, _vel_dot, _pitch_dem*RAD_TO_DEG);
-     gcs().send_text(MAV_SEVERITY_INFO, "cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%1.1f",
-    		 _hgt_dem, _height, _climb_rate, _throttle_dem);
+     gcs().send_text(MAV_SEVERITY_INFO, "spd: cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%4.1f",
+    		 _TAS_dem_adj, TAS, _ahrs.pitch_sensor/100.0f, _pitch_dem*RAD_TO_DEG);
+     //gcs().send_text(MAV_SEVERITY_INFO, "cmd:%4.1f, fdbk:%4.1f, dot:%4.1f, out:%1.1f",
+    		 //_hgt_dem, _height, _climb_rate, _throttle_dem);
 
 
      return;
