@@ -174,6 +174,10 @@ private:
     AP_Float _maxSinkRate_approach;
     AP_Float _speed_p;
     AP_Float _speed_i;
+    AP_Float _alt_p;
+    AP_Float _alt_i;
+    AP_Float _alt_d;
+    AP_Float _speed_throttle_ff;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
