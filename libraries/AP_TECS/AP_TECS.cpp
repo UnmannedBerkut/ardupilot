@@ -474,8 +474,8 @@ void AP_TECS::_update_speed_demand(void)
     // Use 50% of maximum energy rate to allow margin for total energy contgroller
     //const float velRateMax = 0.5f * _STEdot_max / _TAS_state;
     //const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
-    const float velRateMax = 2.0f;	//m/s/s
-    const float velRateMin = -2.0f;	//m/s/s
+    const float velRateMax = 3.0f;	//m/s/s
+    const float velRateMin = -3.0f;	//m/s/s
     const float TAS_dem_previous = _TAS_dem_adj;
 
     // assume fixed 10Hz call rate
@@ -1032,6 +1032,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 {
 	static float _integ = 0.0f;
 	static float _throttle_integ = 0.0f;
+	static bool _throttle_integ_freeze = false;
 
     // Calculate time in seconds since last update
     uint64_t now = AP_HAL::micros64();
@@ -1058,9 +1059,6 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      _PITCHmaxf = aparm.pitch_limit_max_cd * 0.01f;
      _PITCHminf = aparm.pitch_limit_min_cd * 0.01f;
 
-     //!!!!!!!!!!!!!!!!!!!!!!!!
-     //_throttle_dem = 0.5f;
-
      //get speed
      _ahrs.airspeed_estimate(&_EAS);
      float TAS = _EAS * EAS2TAS;
@@ -1069,7 +1067,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      if (_DT > 0.5f)
      {
     	 _TAS_dem_adj = TAS;
-    	 _integ = _ahrs.pitch_sensor/100.0f;	//This desen't consider contribution from P gain, but transitions are smooth enough without out it
+    	 _integ = -_ahrs.pitch_sensor/100.0f;	//This dosen't consider contribution from P gain, but transitions are smooth enough without out it
      }
 
      _update_speed_demand();
@@ -1096,11 +1094,32 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
      {
     	 //_throttle_integ = aparm.throttle_cruise / 100.0f;
     	 _throttle_integ = 0.0f;
+    	 _throttle_integ_freeze = true;
      }
 
      float alt_error = _hgt_dem - _height;
+     float climb_rate_cmd = 0.0f;
+     float climb_rate_error = climb_rate_cmd - _climb_rate;
      float throttle_ff = _TAS_dem_adj * _speed_throttle_ff;
-     _throttle_dem =  alt_error * _alt_p + _climb_rate * -_alt_d + _throttle_integ + throttle_ff;
+
+     if (!_throttle_integ_freeze)
+    	 _throttle_integ += climb_rate_error * _alt_i;
+
+     _throttle_dem =  alt_error * _alt_p + climb_rate_error * _alt_d + _throttle_integ + throttle_ff;
+
+     //limit and freeze integrator if frozen
+     if (_throttle_dem >= 1.0f)
+     {
+    	 _throttle_dem = 1.0f;
+    	 _throttle_integ_freeze = true;
+     }
+     else if (_throttle_dem <= 0.0f)
+     {
+    	 _throttle_dem = 0.0f;
+    	 _throttle_integ_freeze = true;
+     }
+     else
+    	 _throttle_integ_freeze = false;
 
 
      //display working variables
