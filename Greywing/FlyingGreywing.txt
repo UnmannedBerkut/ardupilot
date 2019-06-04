@@ -1,0 +1,53 @@
+FlyingGreywing:
+
+...In simulation (SITL)
+
+You will need a GCS. Many are available (Mission Planner, QGC, AP Planner)
+All of them suck except for Mission Planner, but it is Windoze only
+To install QGC: https://docs.qgroundcontrol.com/en/getting_started/download_and_install.html
+$ sudo usermod -a -G dialout $USER
+$ sudo apt-get remove modemmanager -y
+$ sudo apt install gstreamer1.0-plugins-bad gstreamer1.0-libav -y (only necessary for video)
+
+$ chmod +x ./QGroundControl.AppImage
+$ ./QGroundControl.AppImage
+
+Build and run simulator. From ardupilot dir
+$ ./waf clean
+$ ./waf distclean
+$ cd ArduPlane
+$ ../Tools/autotest/sim_vehicle.py -D --custom-location=32.70119,-117.25411,40,0 --add-param-file=../Greywing/SimSettings.param
+
+Connect sim to GCS:
+Add a TCP comm link - 127.0.0.1 port 5762 or 5763
+
+Build a misison:
+-First misison waypoint should be takeoff - set pitch to 15deg and alt to something reasonable (100m)
+-Add waypoints as desired
+-Last waypoint should be a "jump to item" (aka DO_JUMP). Set item number to second waypoint (not the takeoff waypoint (or whatever you want) and repeat to -1 (indefinate)
+-If Jump waypoint is not set, RTL flight mode will be set after last wpt (return to home)
+
+To takeoff:
+Set Desired airspeed (20m/s is reasonable) (TRIM_ARSPD_CM = 20 via GCS or param set)
+Arm vehicle
+change flight mode to AUTO (should have been in MANUAL)
+
+Flight modes tested:
+MAN (joystick req)
+FBWA (joystick req)
+FBWB  (joystick req)
+LOIT
+AUTO
+GUIDED
+
+Useful SITL commands: http://ardupilot.org/dev/docs/using-sitl-for-ardupilot-testing.html
+
+From the running simulator command line
+param set SIM_WIND_DIR 180
+param set SIM_WIND_SPD 10
+param set SIM_WIND_TURB 1
+param set SIM_RC_FAIL 1
+param set SIM_GPS_DISABLE 1
+(or params can be set via the GCS)
+
+SR1_... sets the transmitted rate of various telem messages from aircraft->GCS
