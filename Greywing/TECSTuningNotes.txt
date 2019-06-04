@@ -1,0 +1,40 @@
+For the offical tuning guide see: http://ardupilot.org/plane/docs/tecs-total-energy-control-system-for-speed-height-tuning-guide.html
+
+
+TRIM_ARSPD_CM - dosen't affect tuning. This is the commanded airspeed when sending discreet airspeed commands (ie in loiter, guided, auto). In FBWB, stick commands are used to change alt/airspeed and discrete alt/airspeed commands are ignored.
+
+*TRIM_THROTTLE - inital offset of FF throttle estimate
+
+*THR_MAX & THR_MIN - limts maximum commanded throttle in *all* but manual mode. Tunning effect: increacing the difference between these values (MAX-MIN) increaces Total Engergy -> throttle gain and throttle ff gain
+
+ARSPD_FBW_MAX & MIN - Sets limits for target airspeeds (airspeed demand), and stick airspeed commands in FBWA mode. No tuning effect
+Note!!: It is possible to send an airspeed command lower (but not higher) than this limit in Loit, Guided, and auto modes.
+
+LIM_PITCH_MAX & MIN - Sets limits for pitch that can be commanded by TECS. No tuning effect
+
+*TECS_CLIMB_MAX & TECS_SINK_MIN - Sets max amd min target vertical speed for climbs/descents. Tuning Effect: The spread between these numbers affect throttle FF and total engergy error -> throttle. Increacing the spread decreaces the throttle response for each
+
+TECS_SINK_MAX - This is the maxium descent rate commanded by TECS. Don't confuse this with TECS_SINK_MIN
+
+*TECS_TIME_CONST - Overall equivilent P gain for system
+
+*TECS_THR_DAMP - Total Energy Dot error -> throttle gain
+
+*TECS_PTCH_DAMP - Specific Balanaced (pitch & throttle) Engery Dot error -> pitch gain. Not very effective, typically set to zero
+
+*TECS_VERT_ACC - limits rate of change of commanded pitch angle. Decreace to slow pitch response. Very effective at reducing large pitch up/down motions. Strange units (not g or m/s/s) (currentely set to 4.0)
+
+*TECS_INTEG_GAIN - Integrator for total energy. This determines how fast airspeed changes
+
+
+Tuning Notes:
+-A proper tune is a balance between TECS_CLIMB_MAX-TECS_SINK_MIN and THR_MAX - THR_MIN. These are the feedfoward terms. In climb (>100m) verify that pitch mimits are not exceeded, TECS_CLIMB_MAX is achieved, on airspeed and throttle is near THR_MAX. In descent verify that pitch limits are not exceeded, TECS_SINK_MIN is achieved, on airspeed, and throttle is just barly saturating at THR_MIN. This should produce some overshoot on descent but no overshoot on climbs.
+-For climbs/decsents the throttle should arrive at a constant value without the integrator respoinding to fine tune the throttle to achieve the correct vertical speed
+-If oveshooting the target climb/descent rate and subsequentely leveloff, increace TECS_CLIMB_MAX-TECS_SINK_MIN difference and/or decreace THR_MAX-THR_MIN difference.
+-Setting TECS_SINK_MAX so something less than TECS_SINK_MIN should produce a slower descent to come off the throttle limiter more and produce a better level off transition. However for initial testing set TECS_SINK_MAX=TECS_SINK_MIN so that you can see target rate is achieved
+-Make TECS_TIME_CONSTANT as high as practical without noise.
+For very draggy airfrmes with a lot of power (ie fast climbs and descents) TECS_CLIMB_MAX TECS_SINK_MIN and corresponding throttle limts will have to be set to limit the dramatic climb/descent rates (around 7m/s (1300fmp) or less seems to work in simulation)
+-Efficent & underpowered airframes seem to be easier to tune (ie slow climbs and descents)
+
+
+
