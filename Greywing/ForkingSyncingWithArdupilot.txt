@@ -1,0 +1,37 @@
+This project was forked from https://github.com/ArduPilot/ardupilot
+The Greywing branch was created from the ArduPlane-3.9.8 tag which was the latest ArduPlane release at the time
+ArduPlane-3.9.8 is on the plane3.9 branch
+Based on historical development of ardupilot, they typically branch from master to create releases for ArduPlane, ArduCopter, etc
+When updating to the next major version ie plane3.8->plane3.9 the previous branch is abandoned (ie plane3.8) and a new branch is created from the master branch
+The Greywing branch will be developed in a private forked repo in parallel with ardupilot
+At some point it would be useful to incoperate new changes from later arduplane releases into the Greywing branch
+To do that:
+-Git Fetch https://github.com/ArduPilot/ardupilot to bring the forked repo back up to speed with the orginal ardupilot repo
+-Check out the latest release of Arduplane from the tags
+-Git Cherrypick all the commits from the Greywing branch into the checked out branch beginning with ArduPlane-3.9.8 (the commit the greywing branch was created from) this can be done using a range of commits or individially to resolve conflicts commit-by-commit
+
+This is similar to how ardupilot does it and is (probably) necessary becasue they do not merge changes from arduplane branches back into master
+
+For an example see: https://help.github.com/en/articles/syncing-a-fork
+
+
+
+
+
+Some old notes on how to do this with a locally stored repo:
+
+-Clone github.com project into a local directory /clone
+$ mkdir fork
+$ cd projectFork.git
+$ git init --bare
+$ cd /clone
+$ git push --all /projectFork.git
+$ git push --mirror /projectFork.git
+-in GitKracken clone into your working directory from projectFork.git
+-set the remote orgin to the orginal github.com project path, you should see the corresponding branches listed under origin
+-create another remote using the projectFork name pointing to the local repo for push/pull, you shold see the corresponding branches of your fork listed under projectFork
+-Fetching should fetch from both repos
+-pushing should only push to your repo
+
+
+
