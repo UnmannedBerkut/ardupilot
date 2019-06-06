@@ -1,0 +1,9 @@
+Pitot calibration pressure vs reported speed:
+
+1"H2O = 248.84Pa = ~21.5m/s
+2"H2O = 497.68Pa = ~29m/s
+3"H2O = 746.52Pa = ~35m/s
+
+References:
+http://bristolite.com/interfaces/psi_wind.aspx
+https://www.engineeringtoolbox.com/wind-load-d_1775.html
