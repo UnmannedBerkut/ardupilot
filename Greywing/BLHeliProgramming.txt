@@ -1,0 +1,20 @@
+Assumes DYS BLHeli XMS30A
+Download BLHeliSuite "BLHeliSuite16714901.zip" from https://www.mediafire.com/folder/dx6kfaasyo24l/BLHeliSuite
+Do not use BLHeliSuite32_32614a.zip
+
+Prepare arduino Mega2560:
+Make Arduino 4way-interface
+Use 4wArduino_m2560_16_MULTIv20002.hex
+
+Connect:
+PWM in conncector ground to ground, signal to pin 51
+Power up the motor controller with a seperate power supply
+
+Select SIlabs BLHeli bootloader (4way-if)
+
+Connect to arduino using connect button at very bottom
+Click Check - You shold see the ECS you connected show up in the list
+
+
+Flash firmware and write settings as necessary
+Note Multicopter settings do not have a voltage limiter - power will be reduced untill unable to maintain altitude
