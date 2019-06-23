@@ -20,8 +20,10 @@ CMD ["/ardupilot/Tools/autotest/sim_vehicle.py", "--console", "--map", "-D"]
 
 
 # run with:
-# docker run --rm -it --net=host -v /tmp/.X11-unix/X1:/tmp/.X11-unix/X1 -e DISPLAY=:1 greywing
 #
-# older versions of gnome would be X1 and :1
-# see here for explanation:
-# https://bugzilla.gnome.org/show_bug.cgi?id=747339#c20
+# docker run \
+#     --rm -it \
+#     --net=host \
+#     -v /tmp/.X11-unix:/tmp/.X11-unix \
+#     -e DISPLAY=:1 \
+#     docker-mocu4.di2e.net/greywing
