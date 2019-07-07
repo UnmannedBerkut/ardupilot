@@ -1,0 +1,7 @@
+-See page 14 of  spec scheet under "FB resistor Network" for appropriate formula
+-Stock configuration:  12v out, R1 1Meg ohm, R2 88.5k ohm
+-Replacing the indicated resistor with a 220K ohm will convert 12V output to approx 5.4V
+-The resistor can touch the ajacent capacitor
+-ensure the risistor is electrically connected to pads
+-If output is low (~1.5v), the resistor is not making an elecrical connection
+

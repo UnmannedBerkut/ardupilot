@@ -1,0 +1,11 @@
+Subnet: 192.168.10.xxx
+
+Aicraft Radio:	.10
+Axis M7001:	.11
+
+GCS Radio:	.20
+Laptop (GCS):	.21
+
+Axis credentals:	root root
+Radio credentals	admin admin00
+Radio encryption key:	greywing00

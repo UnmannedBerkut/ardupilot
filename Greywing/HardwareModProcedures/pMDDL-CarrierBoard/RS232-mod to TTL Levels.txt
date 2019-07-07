@@ -1,0 +1,4 @@
+Procedure to change RS-232 level serial I/O to TTL
+-Remove indicated chip by applying excess solder to pins, heating all pins on one side and prying up
+-Apply green wires (blue wires in photo) as indicated in the photo
+-Note DB9 was removed in this photo and preplaced with a pin header
