@@ -16,7 +16,8 @@ RUN \
     ../Tools/autotest/sim_vehicle.py -wD < /dev/null
 
 WORKDIR /ardupilot/ArduPlane
-CMD ["/ardupilot/Tools/autotest/sim_vehicle.py", "--console", "--map", "-D"]
+
+CMD ["/ardupilot/Tools/autotest/sim_vehicle.py", "--console", "--map", "-D", "--custom-location=32.70119,-117.25411,40,0", "--add-param-file=../Greywing/SimSettings.param"]
 
 
 # run with:
@@ -25,5 +26,5 @@ CMD ["/ardupilot/Tools/autotest/sim_vehicle.py", "--console", "--map", "-D"]
 #     --rm -it \
 #     --net=host \
 #     -v /tmp/.X11-unix:/tmp/.X11-unix \
-#     -e DISPLAY=:1 \
+#     -e DISPLAY=$DISPLAY \
 #     docker-mocu4.di2e.net/greywing
