@@ -40,7 +40,7 @@ public:
     }
 
 protected:
-    const float hover_throttle = 0.7f;
+    const float hover_throttle = 2.0; // increace to reduce max power of motor (was 0.7)
     const float air_density = 1.225; // kg/m^3 at sea level, ISA conditions
     float angle_of_attack;
     float beta;
@@ -53,14 +53,14 @@ protected:
         float c = 0.24;
         float c_lift_0 = 0.56;
         float c_lift_deltae = 0;
-        float c_lift_a = 6.9;
+        float c_lift_a = 80; //coeff of lift as a function of AOA? (was 6.9)
         float c_lift_q = 0;
         float mcoeff = 50;
         float oswald = 0.9;
         float alpha_stall = 0.4712;
         float c_drag_q = 0;
         float c_drag_deltae = 0.0;
-        float c_drag_p = 0.1;
+        float c_drag_p = 0.03; //coeff of drag as a function of airspeed (paracitic drag) (was 0.1)
         float c_y_0 = 0;
         float c_y_b = -0.98;
         float c_y_p = 0;
