@@ -1,0 +1,6 @@
+Axis M7001:
+gst-launch-1.0.exe rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! autovideosink
+(or xvimagesink fro linux) 
+
+The "special" Mission planner Gstreamer pipe:
+rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! videoconvert ! video/x-raw,format=BGRA ! appsink name=outsink
