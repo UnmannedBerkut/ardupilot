@@ -353,7 +353,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     if (on_ground() && !tailsitter) {
         // add some ground friction
         Vector3f vel_body = dcm.transposed() * velocity_ef;
-        accel_body.x -= vel_body.x * 0.1f;
+        accel_body.x -= vel_body.x * 0.1f;	//Reduced ground friction to allow more assertative takeoffs (was 0.3)
     }
 }
     
