@@ -1,0 +1,15 @@
+--For Axis M7001:
+gst-launch-1.0.exe rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! autovideosink
+(or xvimagesink for linux) (glimagesink should work for both win and linux) 
+
+--The "special" Mission planner Gstreamer pipe:
+rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! videoconvert ! video/x-raw,format=BGRA ! appsink name=outsink
+
+--Notes on camera Aspect ratios:
+Runcam owl Plus (black) = 700TVL is a widescreen format and appears compressed when converted by the Axis M7001. Use "glimagesink pixel-aspect-ratio=3/4" instead of "autovideosink" to use openGL and set correct aspect ratio
+
+gst-launch-1.0.exe rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! glimagesink pixel-aspect-ratio=4/5
+
+--Foxeer camera (orange) is normal format and uses regular aspect ratio of 10/11. This works by default or use "glimagesink pixel-aspect-ratio=10/11"
+
+gst-launch-1.0.exe rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! glimagesink pixel-aspect-ratio=10/11

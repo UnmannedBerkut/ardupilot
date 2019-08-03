@@ -1,0 +1,29 @@
+8-10Mbps max
+Compression 30
+704x480
+GOV 2
+Variable bit rate
+
+~11MBps max
+compression 20 - yields only a minor improvement in image quality
+
+~7.5MBps max
+compression 60
+
+Note: GOV 2->4 dosen't seem to reduce much bandwidth
+
+Set radio bandwidth as appropriate for chosen video bitrate
+Below table is reproduced from pMDDL2450 spec sheet
+BPSK_1/2 3 -99.5 30dBm
+QPSK_1/2 5.9 -98 30dBm
+QPSK_3/4 8.8 -96 30dBm
+16QAM_1/2 11.6 -92 30dBm
+16QAM_3/4 17.1 -90 30dBm
+64QAM_2/3 22.8 -85 30dBm
+64QAM_3/4 25.5 -83.5 30dBm
+64QAM_5/6 27.8 -81 30dBm
+
+compression=60 w/ QPSK_3/4 seems to be a good compromise
+
+
+
