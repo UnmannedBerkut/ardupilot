@@ -13,3 +13,5 @@ gst-launch-1.0.exe rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? l
 --Foxeer camera (orange) is normal format and uses regular aspect ratio of 10/11. This works by default or use "glimagesink pixel-aspect-ratio=10/11"
 
 gst-launch-1.0.exe rtspsrc location=rtsp://192.168.10.11/axis-media/media.amp? latency=10 ! decodebin ! glimagesink pixel-aspect-ratio=10/11
+
+Note: A convient install of gstreamer comes along with MissionPlanner (windows version) at: C:\ProgramData\Mission Planner\gstreamer\1.0\x86_64\bin
