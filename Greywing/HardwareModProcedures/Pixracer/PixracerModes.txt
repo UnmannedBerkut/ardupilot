@@ -1,0 +1,5 @@
+--Airspeed sensor: Solder 4 pigtails to the back of the GPS connector - power, ground, I2C SCL, I2C SDA
+This will allow airspeed sensor and mags to be on same I2C buss
+(note only use MS4525DO sensor, the new MS5525 sensor is very sensitive to moisture)
+
+--If using telemetery out to FrSky RC transciever: Solder together FRS (FrSky) 2 center pins. (FrSky OUT & IN on the accompanying schematic)
