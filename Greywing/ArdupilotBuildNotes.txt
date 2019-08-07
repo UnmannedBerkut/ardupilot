@@ -25,7 +25,7 @@ $ ./waf distclean
 $ cd /ardupilot/ArduPlane (for plane)
 $ ../Tools/autotest/sim_vehicle.py -w -D (this will configure waf, build arduplane for Linux in debuf mode -D, run the sim and reset the EEPROM settings -w) (Debug mode is necessary to avoid compile errors with some versions)
 kill using Ctrl-C and rerun with
-$ ../Tools/autotest/sim_vehicle.py -D --custom-location=32.70119,-117.25411,40,0 --frame=plane-elevon --add-param-file=../Greywing/SimSettings.param
+$ ../Tools/autotest/sim_vehicle.py -D --custom-location=32.70119,-117.25411,40,0 --frame=plane-elevon-revthrust --add-param-file=../Greywing/SimSettings.param
 (See advanced usage below for explination of sim_vehicle.py command line arguments)
 
 Connect your GCS to TCP port 5762 or 5763 which emulates a mavlink serial connection
