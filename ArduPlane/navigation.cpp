@@ -107,9 +107,16 @@ void Plane::calc_airspeed_errors()
     // may be using synthetic airspeed
     ahrs.airspeed_estimate(&airspeed_measured);
 
-    // FBW_B airspeed target
-    int32_t trim_airspeed_cm = (int32_t)aparm.airspeed_cruise_cm;	//cm/s TODO: use the parameter setting
-    //TODO: check that trim isint higher or lower than max / min
+    //Calculate airspeed command (target_airspeed_cm) based on stick position and TRIM setting
+    //Throttle stick neutral: target_airspeed_cm = TRIM_ARSPD_CM
+    //Throttle stick full forward: target_airspeed_cm = ARSPD_FBW_MAX
+    //Throttle stick full aft: target_airspeed_cm = ARSPD_FBW_MIN
+    int32_t trim_airspeed_cm = (int32_t)aparm.airspeed_cruise_cm;	//cm/s derived from TRIM_ARSPD_CM
+    //check limits
+    if (trim_airspeed_cm > ((int32_t)aparm.airspeed_max * 100))
+    	trim_airspeed_cm = (int32_t)aparm.airspeed_max * 100;
+    if (trim_airspeed_cm < ((int32_t)aparm.airspeed_min * 100))
+    	trim_airspeed_cm = (int32_t)aparm.airspeed_min * 100;
     int16_t throttle_control = channel_throttle->get_control_in(); //+-100 based on full stick travel
     if (control_mode == FLY_BY_WIRE_B || 
         control_mode == CRUISE) {
@@ -121,7 +128,6 @@ void Plane::calc_airspeed_errors()
     	}
     	target_airspeed_cm = target_airspeed_cm / 100 + trim_airspeed_cm;
 
-    printf("%d\n", target_airspeed_cm);  //!!!!!!!!!!!!!!!!!!!!!!!
     } else if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
         // Landing airspeed target
         target_airspeed_cm = landing.get_target_airspeed_cm();
@@ -151,8 +157,8 @@ void Plane::calc_airspeed_errors()
     // Apply airspeed limit
     if (target_airspeed_cm > (aparm.airspeed_max * 100))
         target_airspeed_cm = (aparm.airspeed_max * 100);
-
-    //!!!!!ADD lower limit here
+    if (target_airspeed_cm < (aparm.airspeed_min * 100))
+        target_airspeed_cm = (aparm.airspeed_min * 100);
 
     // use the TECS view of the target airspeed for reporting, to take
     // account of the landing speed
