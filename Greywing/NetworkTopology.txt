@@ -2,7 +2,7 @@ Subnet: 192.168.10.xxx
 
 Aicraft Radio:	.10
 Axis M7001:	.11
-Aricraft port: UDP 20003 (set by pMDDL radio)
+Aricraft port: .12:20003 UDP (set by pMDDL radio)
 
 GCS Radio:	.20
 Laptop (GCS):	.21

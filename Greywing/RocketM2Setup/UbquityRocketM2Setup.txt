@@ -1,0 +1,15 @@
+Setup for Ubquity Rocket M2:
+EU devices (non US) are able to transmit beyond the 2.4Ghz band in the range 2.4-2.7Ghz. 2.5Ghz and up is far less crowded.
+US devices are blocked and only able to Tx in the 2.4 band
+
+To access these higher uncrowded frequencies:
+Flash firmware: "XM.v5.6.15-sign.31612.170908.1458.bin" from this repo
+
+On the device that will be configured as the Access Point....
+SSH into the device
+Execute # enable_ct
+
+Log into the device with a browser
+
+Select complance test mode from the country settings.
+This will allow any frequency to be used, not just the ones for the selected counrty

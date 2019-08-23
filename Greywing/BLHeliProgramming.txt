@@ -1,6 +1,7 @@
-Assumes DYS BLHeli XMS30A
+Assumes DYS BLHeli XMS30A (16 bit)
+or newer controller: Favourite CloudPhoenix 50A
 Download BLHeliSuite "BLHeliSuite16714901.zip" from https://www.mediafire.com/folder/dx6kfaasyo24l/BLHeliSuite
-Do not use BLHeliSuite32_32614a.zip
+Use BLHeliSuite32_32614a.zip ONLY if you have a 32 bit motor controller (BLHeli-32)
 
 Prepare arduino Mega2560:
 Make Arduino 4way-interface
