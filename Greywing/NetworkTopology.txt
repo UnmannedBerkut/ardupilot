@@ -11,4 +11,6 @@ GCS port: UDP 20002 (set by pMDDL radio)
 
 Axis credentals:	root root
 Radio credentals	admin admin00
+Ubiquity M2 Radio credentals	ubnt ubnt
+M900 Radio credentals	ubnt ubnt00
 Radio encryption key:	greywing00
