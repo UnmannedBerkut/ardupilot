@@ -1,0 +1,5 @@
+RC Radio: Switches ALL UP, Slider UP
+Pitot: 0-4m/s on ground, 9-12 when plugged
+Mags: cardnal headings CHECK
+Mission: Loaded & checked
+Auto Takeoff: check
