@@ -17,7 +17,7 @@ RUN \
 
 WORKDIR /ardupilot/ArduPlane
 
-CMD ["/ardupilot/Tools/autotest/sim_vehicle.py", "-D", "--frame=plane-elevon-revthrust", "--custom-location=32.70119,-117.25411,40,0", "--add-param-file=../Greywing/SimSettings.param", "--out=172.17.0.1:14550"]
-
+ENTRYPOINT ["/ardupilot/Tools/autotest/sim_vehicle.py", "-D", "--frame=plane-elevon-revthrust", "--add-param-file=../Greywing/SimSettings.param", "--out=172.17.0.1:14550"]
+CMD ["--custom-location=32.70119,-117.25411,40,0"]
 # run with:
 # docker run --rm -it docker-mocu4.di2e.net/greywing
