@@ -1,0 +1,63 @@
+Structure:
+Aircraft pose comes from Arduplane SITL via mavlink on TCP port 5762
+Airsim Client (cv_Greywing.py) uses Mavlinkpython to fetch aircraft pose and pass to Server via simSetVehiclePose()
+Airsim Server runs Unreal Engine to generate scene and .png image of the scene
+Airsim Client recieves .png image from Airsim Server via client.simGetImage()
+Airsim Client renders overlays in OpenCV, displays video locally, and uses gstreamer pipes to create a H264 network video stream
+
+Airsim Server:
+-Has only been demoed to run on Windows.
+-Running on linux requires building Unreal which is a PIA
+
+Setting up Airsim Server on Windows:
+https://github.com/microsoft/AirSim/blob/master/docs/build_windows.md
+The "Blocks" environment needs to be built manually like it was a custom environment, see: https://github.com/microsoft/AirSim/blob/master/docs/build_windows.md
+After running the VS project, it will launch the Unreal Editor. Press "Play" in Unreal. The Airsim server is ready to accept commands
+See this link for configuration options: https://github.com/microsoft/AirSim/blob/master/docs/settings.md#gimbal
+
+Airsim Client:
+-Is basically just a python script
+-Has been sucessfully run on Windows and Linux
+-PythonClient.sln (Airsim) has working examples of AirSim clients
+
+Airsim Client Setup:
+-See: https://github.com/microsoft/AirSim/blob/master/docs/apis.md
+-Although not stricly required by AirSim Client, the Greywing Simulated payload also needs OpenCV & Gstreamer
+-Installing on Nvidia Nano: good to go after following link above (has OpenCv with gstreamer installed)
+--check this using >>> print(cv2.getBuildInformation()) then look for GSTREAMER stuff
+
+Installing on Linux:
+-OpenCV with gstreamer support must be built from source (pip install opencv-python does not have gstreamer support)
+-Install libraries:
+$ sudo apt-get install build-essential
+$ sudo apt-get install cmake git libgtk2.0-dev pkg-config libavcodec-dev libavformat-dev libswscale-dev
+$ sudo apt-get install python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev libpng-dev libtiff-dev libjasper-dev libdc1394-22-dev
+$ sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+-See: https://docs.opencv.org/4.0.0-beta/d7/d9f/tutorial_linux_install.html
+and https://medium.com/@galaktyk01/how-to-build-opencv-with-gstreamer-b11668fa09c
+-Use version OpenCV 3.3.1 (http://opencv.org/releases.html)
+-Verifythat python is using OpenCV with gstreamer support. From ipython: >>> print(cv2.getBuildInformation())
+
+Installing on Windows - Similar to Linux
+
+Simulating Greywing Payload:
+-Is the identical to the actual payload except:
+--it passes pose info to the Airsim Server
+--it gets video input from Airsim Server instead of USB camera
+--it can control/animate assets in Unreal as well as set fog and link artifact levels
+
+
+Notes:
+-TCP port 5760 on Arupilot Sim dosen't seem to work, use 5762 for the API
+-Airsim API call client.simGetImage() limits the overall rate of the system. Expect 10-20 FPS at 640x480
+-In settings use SR1_EXTRA1 = SR1_POSITION = 20 to set 20hz update rate SR1 is tcp port 5762
+-Using UDP implies going through mavproxy on the simulator which may limit datarate
+-cv_Greywing.py uses relative position which is accepted by the Airsim API directely. This means that the sim will begin at the home location. In other words the Unreal "Player Start" object location will be the SITL's home locaiton
+
+-When shutting down, terminate the Airsim API. This will terminate Unreal properly, otherwise Unreal will hang and need to be terminated manually
+
+Running AirSim examples using VS 2017:
+-To run the example python samples open the AirSim.sln or PythonClient.sln with Visual Studio 2017
+-Various python libraris will need to be downloaded for these to work  - import them by right clicking on "Python Environments", configuring to use Python 3.7, and then installing packages by right clicking on "Python 3.7 (64-bit)"
+
+
