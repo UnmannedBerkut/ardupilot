@@ -78,10 +78,14 @@ pp = pprint.PrettyPrinter(indent=4)
 client = airsim.VehicleClient('192.168.10.21')
 print("Waiting for AirSim Server") 
 client.confirmConnection()
-print("Connected to Airsim Server") 
-client.simEnableWeather(True)
-client.simSetWeatherParameter(airsim.WeatherParameter.Fog, 0)
-client.simSetWeatherParameter(airsim.WeatherParameter.Rain, 0)
+print("Connected to Airsim Server")
+
+#Set weather via the API
+#Note: at the moment this only works in debug mode.
+#Possible Problem: When the Unreal project is cooked for deployemnt weather textures aren't included and an exception is thrown  
+#client.simEnableWeather(True)
+#client.simSetWeatherParameter(airsim.WeatherParameter.Fog, 0)
+#client.simSetWeatherParameter(airsim.WeatherParameter.Rain, 0)
 
 #Add SR1 rate setting to veicle settings
 #Note: TCP 5762 = SR1 in settings
@@ -198,7 +202,7 @@ while(True):
     rawImage = client.simGetImage("0", cameraTypeMap[cameraType])
     if (rawImage == None):
         print("Camera is not returning image, please check airsim for error messages")
-        sys.exit(0)
+        continue
     else:
         png = cv2.imdecode(airsim.string_to_uint8_array(rawImage), cv2.IMREAD_UNCHANGED)
         if (png is not None):
