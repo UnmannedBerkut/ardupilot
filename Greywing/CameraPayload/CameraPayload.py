@@ -48,14 +48,18 @@ cameraType = airsim.ImageType.Scene         #EO color camera
 #cameraType = airsim.ImageType.Infrared     #Thermal Camera TODO: fix frame size in AirSim settings.json file
 
 #Mavlink C2 data
-airspeed = 0.0    #pitot static airspeed (m/s)
-altitude = 0.0    #baro altitude above reference(above takeoff) (m)
+hud_airspeed = 0.0    #pitot static airspeed (m/s)
+hud_altitude = 0.0    #absolute baro altitude (m MSL)
 yaw = 0.0         #IMU heading (magnetometer) (deg true)
 pitch = 0.0       #(deg)
 roll = 0.0        #(deg)
-x = 0
-y = 0
-z = 0 
+global_lat = 0.0
+global_lon = 0.0
+global_alt = 0.0
+global_relative_alt = 0.0
+home_lat = 0.0      #Note: This mesage not typically sent wihout a prior request
+home_lon = 0.0
+home_alt = 0.0      #m MSL
 mode = 0
 waypoints = []        #list of tuples containing known waypoints
 waypoint_quantity = 0 #the number of known waypoints as reported by the autopilot, if this is != len(waypoints) that means some waypoints are missing
@@ -182,14 +186,18 @@ class MavlinkCommandAndControlUDP(Thread):
 
     def run(self):
         global shutdownMavlinkUDP
-        global airspeed
-        global altitude
+        global hud_airspeed
+        global hud_altitude
         global pitch
         global roll
         global yaw
-        global x
-        global y
-        global z
+        global global_lat
+        global global_lon
+        global global_alt
+        global global_relative_alt
+        global home_lat
+        global home_lon
+        global home_alt
         global mode
         global waypoints
         global waypoint_quantity
@@ -219,19 +227,28 @@ class MavlinkCommandAndControlUDP(Thread):
 
                 #foward messages to network		
                 m_network.write(mesg_s.get_msgbuf())
-                 
+
                 #parse specific messages
                 if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_ATTITUDE):
                     pitch = mesg_s.pitch  * 180 / 3.14
                     roll = mesg_s.roll * 180 / 3.14
                     yaw = mesg_s.yaw * 180 / 3.14
                     #print "roll: ", roll, "pitch: ", pitch, "hdg:", yaw
-                if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_VFR_HUD):
-                    airspeed = mesg_s.airspeed
-                    altitude = mesg_s.alt
+                if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_VFR_HUD): 
+                    hud_airspeed = mesg_s.airspeed
+                    hud_altitude = mesg_s.alt
                 if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_HEARTBEAT):
                     if (mesg_s.type == 1):
                         mode = mesg_s.custom_mode
+                if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_GLOBAL_POSITION_INT): 
+                    global_lat = float(mesg_s.lat)/10000000 
+                    global_lon = float(mesg_s.lon)/10000000 
+                    global_alt = float(mesg_s.alt)/1000
+                    global_relative_alt = float(mesg_s.relative_alt)/1000
+                if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_HOME_POSITION): 
+                    home_lat = float(mesg_s.latitude)/10000000 
+                    home_lon = float(mesg_s.longitude)/10000000 
+                    home_alt = float(mesg_s.altitude)/1000
                 if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_MISSION_COUNT):
                     waypoints = []                      #clear the old maypoint list
                     waypoint_quantity = mesg_s.count
@@ -303,12 +320,14 @@ while(True):
         cv2.rectangle(image, (310,230), (330,250), (0,255,0),2)
 
         #Airspeed Slider
-        airspeed_vert_pos = util.lim(-int(airspeed*16)+480,470,30)
-        cv2.putText(image, str(round(airspeed,1)), (10,airspeed_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+        airspeed_vert_pos = util.lim(-int(hud_airspeed*16)+480,470,30)
+        cv2.putText(image, str(round(hud_airspeed,1)), (10,airspeed_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
 
         #Altitude Slider
-        altitude_vert_pos = util.lim(-int(altitude*2)+480,470,30)
-        cv2.putText(image, str(int(round(altitude,0))), (580,altitude_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+        #slider_display_alt = hud_altitude  #for MSL alt (m)
+        slider_display_alt = global_relative_alt  #for alt above takeoff (m)
+        altitude_vert_pos = util.lim(-int(slider_display_alt*1.5)+480,470,30)
+        cv2.putText(image, str(int(round(slider_display_alt,0))), (580,altitude_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
 
         #Flight mode display
         cv2.putText(image, flightMode(mode), (270,20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,    (0, 255, 0), 1, cv2.LINE_AA)      
