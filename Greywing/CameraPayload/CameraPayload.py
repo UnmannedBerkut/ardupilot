@@ -19,16 +19,18 @@
 #  "SimMode": "ComputerVision",
 #  "LocalHostIp": "192.168.10.21"
 #}
- 
+
 import airsim
 
 import time
 from pymavlink import mavutil
-import numpy as np
+import numpy
 import cv2
 from threading import Thread
 from queue import Queue
 import pygeodesy
+import openCVUtils as util
+import pdb  #for debugging - use pdb.set_trace() to set breakpoints inside threads
 
 UseSimulator = True     #set to false for real flight   #TODO: make command line argument
 
@@ -36,7 +38,7 @@ UseSimulator = True     #set to false for real flight   #TODO: make command line
 FMV_DESTINATION = '192.168.10.21'   #AKA: Downlink video destination
 FMV_PORT = '50006'
 MAVLINK_C2_GCS = 'udpout:192.168.10.21:50005'
-CAMERA_FOV = 1000             #(unitless) determined experimentally
+CAMERA_FOV = 500             #(unitless) determined experimentally
 
 #Settings - Simulation only:
 AIRSIM_SERVER = '192.168.10.21'
@@ -72,6 +74,18 @@ zSim = 0.0
 frameCount = 0
 startTime=time.clock()
 fps = 0
+
+def flightMode(i):
+    switch={
+        mavutil.ardupilotmega.PLANE_MODE_MANUAL:'MANUAL',
+        mavutil.ardupilotmega.PLANE_MODE_FLY_BY_WIRE_A:'FBWA',
+        mavutil.ardupilotmega.PLANE_MODE_FLY_BY_WIRE_B:'FBWB',
+        mavutil.ardupilotmega.PLANE_MODE_CRUISE:'CRUISE',
+        mavutil.ardupilotmega.PLANE_MODE_AUTO:'AUTO',
+        mavutil.ardupilotmega.PLANE_MODE_RTL:'RTL',
+        mavutil.ardupilotmega.PLANE_MODE_LOITER:'LOITER',
+        mavutil.ardupilotmega.PLANE_MODE_GUIDED:'GUIDED'}
+    return switch.get(i,"INVALID")
 
 #Warning: Errors in Gstreamer pipes may silentley fail (escpically on Linux).
 #Check pipes using the command line first
@@ -138,7 +152,7 @@ class MavlinkHighSpeedTCP(Thread):
         m_network = mavutil.mavlink_connection(MAVLINK_HIGHSPEED_AUTOPILOT, planner_format=False, notimestamps=True, robust_parsing=True)
 
 	    #ToDo: Add mavlink connection error checking here
-	    print "Opened Mavlink high speed TCP link"
+        print "Opened Mavlink high speed TCP link"
 
         while not shutdownMavlinkTCP:
             #recieve mavlink messages from autopilot
@@ -216,7 +230,8 @@ class MavlinkCommandAndControlUDP(Thread):
                     airspeed = mesg_s.airspeed
                     altitude = mesg_s.alt
                 if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_HEARTBEAT):
-                    mode = mesg_s.custom_mode
+                    if (mesg_s.type == 1):
+                        mode = mesg_s.custom_mode
                 if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_MISSION_COUNT):
                     waypoints = []                      #clear the old maypoint list
                     waypoint_quantity = mesg_s.count
@@ -246,11 +261,11 @@ class MavlinkCommandAndControlUDP(Thread):
 
 #Start the Mavlink servicing threads
 UDPLinkQueue = Queue()
-UDPLinkWorker = MavlinkCommandAndControlUDP(queue)
+UDPLinkWorker = MavlinkCommandAndControlUDP(UDPLinkQueue)
 UDPLinkWorker.start()
 if UseSimulator:
     TCPLinkQueue = Queue()
-    TCPLinkWorker = MavlinkHighSpeedTCP(queue)
+    TCPLinkWorker = MavlinkHighSpeedTCP(TCPLinkQueue)
     TCPLinkWorker.start()
     print "Sim Running - Press 'q' in the video window to quit"
 
@@ -274,14 +289,13 @@ while(True):
         else:
             #convert into a standard OpenCV image frame
             image = cv2.imdecode(airsim.string_to_uint8_array(rawImage), cv2.IMREAD_UNCHANGED)
-            image = image[:,:,0:3]  #Resize from 4 value pixels to 3 value pixels
 
     else: #real flight
         #fetch image from gstreamer
         ret, image = cap.read()
         #trim the frame to match the aspect ratio
-        image = frame[0:1080, 240:1680]
-        image = cv2.resize(frame, (640,480), interpolation=cv2.INTER_AREA)
+        image = image[0:1080, 240:1680]
+        image = cv2.resize(image, (640,480), interpolation=cv2.INTER_AREA)
         
 
     if (image is not None):
@@ -289,24 +303,24 @@ while(True):
         cv2.rectangle(image, (310,230), (330,250), (0,255,0),2)
 
         #Airspeed Slider
-        airspeed_vert_pos = lim(-int(airspeed*16)+480,470,30)
-        cv2.putText(frame, str(round(airspeed,1)), (10,airspeed_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+        airspeed_vert_pos = util.lim(-int(airspeed*16)+480,470,30)
+        cv2.putText(image, str(round(airspeed,1)), (10,airspeed_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
 
         #Altitude Slider
-        altitude_vert_pos = lim(-int(altitude*2)+480,470,30)
-        cv2.putText(frame, str(round(altitude,1)), (580,altitude_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+        altitude_vert_pos = util.lim(-int(altitude*2)+480,470,30)
+        cv2.putText(image, str(int(round(altitude,0))), (580,altitude_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
 
         #Flight mode display
-        cv2.putText(frame, flightMode(mode), (270,20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,    (0, 255, 0), 1, cv2.LINE_AA)      
+        cv2.putText(image, flightMode(mode), (270,20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,    (0, 255, 0), 1, cv2.LINE_AA)      
 
         #Horizon Line
         horizonEarthFrameLeft = numpy.array([[CAMERA_FOV],[-CAMERA_FOV],[0]])    #point x,y,z
         horizonEarthFrameRight = numpy.array([[CAMERA_FOV],[CAMERA_FOV],[0]])    #point x,y,z
-        horizonCameraFrameLeft = rotateEarth2Camera(horizonEarthFrameLeft,roll,pitch,0)
-        horizonCameraFrameRight = rotateEarth2Camera(horizonEarthFrameRight,roll,pitch,0)
-        horizonOpenCVFrameLeft = convertCamera2OpenCV(horizonCameraFrameLeft)
-        horizonOpenCVFrameRight = convertCamera2OpenCV(horizonCameraFrameRight)
-        cv2.line(frame, ( int(horizonOpenCVFrameLeft[0]),int(horizonOpenCVFrameLeft[1]) ),
+        horizonCameraFrameLeft = util.rotateEarth2Camera(horizonEarthFrameLeft,roll,pitch,0)
+        horizonCameraFrameRight = util.rotateEarth2Camera(horizonEarthFrameRight,roll,pitch,0)
+        horizonOpenCVFrameLeft = util.convertCamera2OpenCV(horizonCameraFrameLeft)
+        horizonOpenCVFrameRight = util.convertCamera2OpenCV(horizonCameraFrameRight)
+        cv2.line(image, ( int(horizonOpenCVFrameLeft[0]),int(horizonOpenCVFrameLeft[1]) ),
                     ( int(horizonOpenCVFrameRight[0]),int(horizonOpenCVFrameRight[1]) ),(0,255,0),2)
 
         ##EastTic
@@ -332,6 +346,7 @@ while(True):
         cv2.imshow("Video", image)
 
         #send to gstreamer
+        image = image[:,:,0:3]  #Resize from 4 value pixels to 3 value pixels
         out.write(image)	    
 
         #calculate frame rate
