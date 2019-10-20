@@ -28,12 +28,24 @@ import numpy as np
 import cv2
 from threading import Thread
 from queue import Queue
+import pygeodesy
 
 UseSimulator = True     #set to false for real flight   #TODO: make command line argument
-#cameraType = airsim.ImageType.Infrared    #TODO: fix frame size
-cameraType = airsim.ImageType.Scene
 
-#pymavlink data
+#Settings:
+FMV_DESTINATION = '192.168.10.21'   #AKA: Downlink video destination
+FMV_PORT = '50006'
+MAVLINK_C2_GCS = 'udpout:192.168.10.21:50005'
+CAMERA_FOV = 1000             #(unitless) determined experimentally
+
+#Settings - Simulation only:
+AIRSIM_SERVER = '192.168.10.21'
+MAVLINK_HIGHSPEED_AUTOPILOT = 'tcp:192.168.10.10:5762'
+MAVLINK_C2_AUTOPILOT = 'tcp:192.168.10.10:5763'
+cameraType = airsim.ImageType.Scene         #EO color camera
+#cameraType = airsim.ImageType.Infrared     #Thermal Camera TODO: fix frame size in AirSim settings.json file
+
+#Mavlink C2 data
 airspeed = 0.0    #pitot static airspeed (m/s)
 altitude = 0.0    #baro altitude above reference(above takeoff) (m)
 yaw = 0.0         #IMU heading (magnetometer) (deg true)
@@ -45,15 +57,18 @@ z = 0
 mode = 0
 waypoints = []        #list of tuples containing known waypoints
 waypoint_quantity = 0 #the number of known waypoints as reported by the autopilot, if this is != len(waypoints) that means some waypoints are missing
-FOV = 1000             #camera field of view (determined experimentally)
+
 shutdownMavlinkUDP = False
 shutdownMavlinkTCP = False
 
-fontFace = cv2.FONT_HERSHEY_SIMPLEX
-fontScale = 0.5
-thickness = 2
-textSize, baseline = cv2.getTextSize("FPS", cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-textOrg = (10, 10 + textSize[1])
+#Simulation specific pose
+pitchSim = 0.0
+rollSim = 0.0
+yawSim = 0.0
+xSim = 0.0
+ySim = 0.0
+zSim = 0.0
+
 frameCount = 0
 startTime=time.clock()
 fps = 0
@@ -64,15 +79,15 @@ fps = 0
 ## Set Video In / Out ##
 if UseSimulator:    #for Linux PC
     #Video Input - from Airsim Server 
-    client = airsim.VehicleClient('192.168.10.21')
+    client = airsim.VehicleClient(AIRSIM_SERVER)
     print("Waiting for AirSim Server") 
     client.confirmConnection()
     print("Connected to Airsim Server")
 
-    client.simEnableWeather(True)   #optional
+    client.simEnableWeather(True)   #Enable Dynamic Weather - optional
 
-    #Video Output - software H264 encoder
-    out = cv2.VideoWriter('appsrc ! videoconvert ! video/x-raw, format=(string)I420  ! videorate ! video/x-raw, framerate=(fraction)5/1 ! x264enc bitrate=300 tune=zerolatency ! video/x-h264, stream-format=(string)byte-stream ! h264parse ! rtph264pay mtu=1400 ! udpsink host=192.168.10.21 port=50006 sync=false async=false', cv2.CAP_GSTREAMER,0,5,(640,480), True)
+    #Set output encoder to use software encoder    
+    H264_ENCODER = 'x264enc bitrate=300 tune=zerolatency'   #NOTE BITRATE (kbps)   
 
 else:   #for Nvidia Nano
 
@@ -82,8 +97,12 @@ else:   #for Nvidia Nano
     #Lepoard Camera:
     cap = cv2.VideoCapture('v4l2src device=/dev/video0 ! video/x-raw, format=(string)YUY2, width=(int)1920, height=(int)1080, framerate=(fraction)30/1 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 
-    #Video Output - hardware H264 encoder
-    out = cv2.VideoWriter('appsrc ! videoconvert ! video/x-raw, format=(string)I420  ! videorate ! video/x-raw, framerate=(fraction)5/1 ! omxh264enc control-rate=2 bitrate=400000 ! video/x-h264, stream-format=(string)byte-stream ! h264parse ! rtph264pay mtu=1400 ! udpsink host=192.168.10.21 port=50006 sync=false async=false', cv2.CAP_GSTREAMER,0,5,(640,480), True)
+    #Set output encoder to use hardware (Nvidia Nano)
+    H264_ENCODER = 'omxh264enc control-rate=2 bitrate=400000' #NOTE BITRATE (bps)
+
+   
+#Create Video Output Pipe
+out = cv2.VideoWriter('appsrc ! videoconvert ! video/x-raw, format=(string)I420  ! videorate ! video/x-raw, framerate=(fraction)5/1 ! '+H264_ENCODER+' ! video/x-h264, stream-format=(string)byte-stream ! h264parse ! rtph264pay mtu=1400 ! udpsink host='+FMV_DESTINATION+' port='+FMV_PORT+' sync=false async=false', cv2.CAP_GSTREAMER,0,5,(640,480), True)
 
 #Error checking for output pipe only
 #TODO: Add error checking for input pipe
@@ -92,7 +111,8 @@ if (out.isOpened()):
 else:
     print("Output pipe Creation Failed")
 
-#Mavlink high speed link for driving Unreal sim pose (not used if UseSimulator=False)
+#Mavlink high speed link for driving Unreal sim pose
+#Not used if UseSimulator=False
 #Ardupilot setup:
 #Add SR1 rate setting to settings
 #Note: TCP 5762 = SR1 in settings
@@ -107,38 +127,37 @@ class MavlinkHighSpeedTCP(Thread):
         self.queue = queue
 
     def run(self):
-        global shutdownMavlinkUDP
-        global pitch
-        global roll
-        global yaw
-        global x
-        global y
-        global z
+        global shutdownMavlinkTCP
+        global pitchSim
+        global rollSim
+        global yawSim
+        global xSim
+        global ySim
+        global zSim
 
-        m_network = mavutil.mavlink_connection('tcp:192.168.10.10:5762', planner_format=False, notimestamps=True, robust_parsing=True)
+        m_network = mavutil.mavlink_connection(MAVLINK_HIGHSPEED_AUTOPILOT, planner_format=False, notimestamps=True, robust_parsing=True)
 
-	#ToDo: Add mavlink connection error checking here
-	print "Opened Mavlink high speed TCP link"
+	    #ToDo: Add mavlink connection error checking here
+	    print "Opened Mavlink high speed TCP link"
 
-        while not shutdownMavlinkUDP:
+        while not shutdownMavlinkTCP:
             #recieve mavlink messages from autopilot
             mesg_s = m_network.recv_match()
 
             if mesg_s is not None:
-                #foward messages to network
-                #m_network.write(mesg_s.get_msgbuf())
-
-                #parse specific messages
+                #parse attitude message
                 if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_ATTITUDE):
-                    pitch = mesg_s.pitch
-                    roll = mesg_s.roll
-                    yaw = mesg_s.yaw
+                    pitchSim = mesg_s.pitch
+                    rollSim = mesg_s.roll
+                    yawSim = mesg_s.yaw
                     # print ("roll: ", roll, "ptch: ", pitch)
+                #parse posiiton message
                 if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_LOCAL_POSITION_NED):
-                    x = mesg_s.x 
-                    y = mesg_s.y 
-                    z = mesg_s.z
+                    xSim = mesg_s.x 
+                    ySim = mesg_s.y 
+                    zSim = mesg_s.z
 
+        m_network.close()        
         print("Shutting down Mavlink high speed TCP link")
 
 class MavlinkCommandAndControlUDP(Thread):
@@ -160,25 +179,24 @@ class MavlinkCommandAndControlUDP(Thread):
         global mode
         global waypoints
         global waypoint_quantity
+        global UseSimulator
 
-	#Init Mavlink source
-        
-    if UseSimulator:    
-        #Use this for simulation (connect to sim via UDP)	
-        m_serial = mavutil.mavlink_connection('udpin:192.168.10.10:50005',planner_format=False,notimestamps=True,robust_parsing=True)
-    else:
-        #Use this for actual flight (connect to autopilot via serial)
-        #On Nvidia Nano /dev/ttyTHS1 is J41, the largest pinheader: Tx=pin8, Rx=pin10
-        m_serial = mavutil.mavlink_connection('/dev/ttyTHS1',baud=115200, planner_format=False,notimestamps=True,robust_parsing=True)
+	    #Init Mavlink source
+        if UseSimulator:    
+            #Use this for simulation (connect to autopilot via network)	
+            m_serial=mavutil.mavlink_connection(MAVLINK_C2_AUTOPILOT, planner_format=False, notimestamps=True, robust_parsing=True)
+        else:
+            #Use this for actual flight (connect to autopilot via serial)
+            #On Nvidia Nano /dev/ttyTHS1 is J41, the largest pinheader: Tx=pin8, Rx=pin10
+            m_serial = mavutil.mavlink_connection('/dev/ttyTHS1',baud=115200, planner_format=False,notimestamps=True,robust_parsing=True)
 
-    #init mavlink destination
-    m_network = mavutil.mavlink_connection('udpout:192.168.10.21:50005',planner_format=False,notimestamps=True,robust_parsing=True)
+        #Init mavlink destination (connect to GCS via network)
+        m_network = mavutil.mavlink_connection(MAVLINK_C2_GCS,planner_format=False, notimestamps=True, robust_parsing=True)
 
-	#ToDo: Add mavlink connection error checking here
-	print "Created Mavlink C2 links"
+	    #TODO: Add mavlink connection error checking here
+        print "Created Mavlink C2 links"
 
         while not shutdownMavlinkUDP:
-
             ##Autopilot -> Network##
             #recieve mavlink messages from autopilot
             mesg_s = m_serial.recv_match()
@@ -189,26 +207,31 @@ class MavlinkCommandAndControlUDP(Thread):
                 m_network.write(mesg_s.get_msgbuf())
                  
                 #parse specific messages
-                if (mesg_s.get_header.im_class == mavutil.ardupilotmega.MAVLink_attitude_message):
+                if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_ATTITUDE):
                     pitch = mesg_s.pitch  * 180 / 3.14
                     roll = mesg_s.roll * 180 / 3.14
-                    #print "roll: ", roll, "ptch: ", pitch
-                    #airspeed = mesg_s.roll * 180 / 3.14
-                if (mesg_s.get_header.im_class == mavutil.ardupilotmega.MAVLink_vfr_hud_message):
+                    yaw = mesg_s.yaw * 180 / 3.14
+                    #print "roll: ", roll, "pitch: ", pitch, "hdg:", yaw
+                if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_VFR_HUD):
                     airspeed = mesg_s.airspeed
                     altitude = mesg_s.alt
-                    heading =  mesg_s.heading
-                if (mesg_s.get_header.im_class ==  mavutil.ardupilotmega.MAVLink_heartbeat_message):
+                if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_HEARTBEAT):
                     mode = mesg_s.custom_mode
-                if (mesg_s.get_header.im_class ==  mavutil.ardupilotmega.MAVLink_mission_count_message):
+                if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_MISSION_COUNT):
                     waypoints = []                      #clear the old maypoint list
                     waypoint_quantity = mesg_s.count
                     print waypoint_quantity
-                if (mesg_s.get_header.im_class ==  mavutil.ardupilotmega.MAVLink_mission_item_int_message):
+                if (mesg_s.get_header().msgId ==  mavutil.ardupilotmega.MAVLINK_MSG_ID_MISSION_ITEM_INT):
                     waypoints.append([mesg_s.seq, float(mesg_s.x)/10000000, float(mesg_s.y)/10000000, mesg_s.z, 0.0, 0.0])
                     print waypoints[mesg_s.seq]
-                
+                    #Waypoints - Compute range and bearing for each waypoint
+                    if waypoints != []:
+                        for i in range(len(waypoints)-1):
+                            print pygeodesy.haversine(waypoints[i][1], waypoints[i][2], waypoints[i+1][1], waypoints[i+1][2])
+                        for i in range(len(waypoints)-1):
+                            print pygeodesy.bearing(waypoints[i][1], waypoints[i][2], waypoints[i+1][1], waypoints[i+1][2])
 
+                
             ##Network -> Autopilot##
             #recieve mavlink messages from network
             mesg_d = m_network.recv_match()
@@ -216,6 +239,8 @@ class MavlinkCommandAndControlUDP(Thread):
                 #foward to serial
                 m_serial.write(mesg_d.get_msgbuf())
 
+        m_network.close()
+        m_serial.close()
         print("Shutting Mavlink UDP links")
 
 
@@ -235,7 +260,7 @@ while(True):
 
     if UseSimulator:
         #send pose to sim
-        client.simSetVehiclePose(airsim.Pose(airsim.Vector3r(x, y, z), airsim.to_quaternion(pitch, roll, yaw)), True)
+        client.simSetVehiclePose(airsim.Pose(airsim.Vector3r(xSim, ySim, zSim), airsim.to_quaternion(pitchSim, rollSim, yawSim)), True)
         #set weather on the sim
         #Note: These can also be changed on-the-fly via the weather UI in Unreal w/ the F10 key
         #client.simSetWeatherParameter(airsim.WeatherParameter.Fog, 0)    #0.5 is a lot of fog
@@ -245,7 +270,7 @@ while(True):
         rawImage = client.simGetImage("0", cameraType)
         if (rawImage == None):
             print("Camera is not returning image, please check airsim for error messages")
-            continue    
+            continue    #TODO: fix this so the GCS downlink still works if no Arisim    
         else:
             #convert into a standard OpenCV image frame
             image = cv2.imdecode(airsim.string_to_uint8_array(rawImage), cv2.IMREAD_UNCHANGED)
@@ -260,27 +285,78 @@ while(True):
         
 
     if (image is not None):
-    #center marker
-    cv2.rectangle(image, (310,230), (330,250), (0,255,0),2)
-    #FPS 
-    cv2.putText(image,'FPS ' + str(fps),textOrg, fontFace, fontScale,(255,0,255),thickness)
+        #draw center marker
+        cv2.rectangle(image, (310,230), (330,250), (0,255,0),2)
 
-    #display locally
-    cv2.imshow("Depth", image)
-    #send to gstreamer
-    out.write(image)	    
+        #Airspeed Slider
+        airspeed_vert_pos = lim(-int(airspeed*16)+480,470,30)
+        cv2.putText(frame, str(round(airspeed,1)), (10,airspeed_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+
+        #Altitude Slider
+        altitude_vert_pos = lim(-int(altitude*2)+480,470,30)
+        cv2.putText(frame, str(round(altitude,1)), (580,altitude_vert_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+
+        #Flight mode display
+        cv2.putText(frame, flightMode(mode), (270,20), cv2.FONT_HERSHEY_SIMPLEX, 0.8,    (0, 255, 0), 1, cv2.LINE_AA)      
+
+        #Horizon Line
+        horizonEarthFrameLeft = numpy.array([[CAMERA_FOV],[-CAMERA_FOV],[0]])    #point x,y,z
+        horizonEarthFrameRight = numpy.array([[CAMERA_FOV],[CAMERA_FOV],[0]])    #point x,y,z
+        horizonCameraFrameLeft = rotateEarth2Camera(horizonEarthFrameLeft,roll,pitch,0)
+        horizonCameraFrameRight = rotateEarth2Camera(horizonEarthFrameRight,roll,pitch,0)
+        horizonOpenCVFrameLeft = convertCamera2OpenCV(horizonCameraFrameLeft)
+        horizonOpenCVFrameRight = convertCamera2OpenCV(horizonCameraFrameRight)
+        cv2.line(frame, ( int(horizonOpenCVFrameLeft[0]),int(horizonOpenCVFrameLeft[1]) ),
+                    ( int(horizonOpenCVFrameRight[0]),int(horizonOpenCVFrameRight[1]) ),(0,255,0),2)
+
+        ##EastTic
+        #a = math.radians(20)
+        #horizonEarthFrameLeft = numpy.array([[CAMERA_FOV],[0],[30]])    #Draw vertical tic
+        #horizonEarthFrameRight = numpy.array([[CAMERA_FOV],[0],[0]])
+        ##Rotate it facing east (azmuth) at 10deg below the horizon (elevation)  
+        #horizonEarthFrameLeft = rotateCamera2Earth(horizonEarthFrameLeft, 0,-10,90)
+        #horizonEarthFrameRight = rotateCamera2Earth(horizonEarthFrameRight, 0,-10,90)  
+        ##Rotate it based on vehicle attitude
+        #horizonCameraFrameLeft = rotateEarth2Camera(horizonEarthFrameLeft,roll,pitch,heading)
+        #horizonCameraFrameRight = rotateEarth2Camera(horizonEarthFrameRight,roll,pitch,heading)
+        #horizonOpenCVFrameLeft = convertCamera2OpenCV(horizonCameraFrameLeft)
+        #horizonOpenCVFrameRight = convertCamera2OpenCV(horizonCameraFrameRight)
+        #cv2.line(frame, ( int(horizonOpenCVFrameLeft[0]),int(horizonOpenCVFrameLeft[1]) ),                    ( int(horizonOpenCVFrameRight[0]),int(horizonOpenCVFrameRight[1]) ),(0,255,0),2)
+        
+
+        #display FPS 
+        #cv2.putText(image,'FPS ' + str(fps),textOrg, fontFace, fontScale,(255,0,255),thickness)
+
+        #TODO: only if sim
+        #display locally
+        cv2.imshow("Video", image)
+
+        #send to gstreamer
+        out.write(image)	    
+
+        #calculate frame rate
+        #frameCount  = frameCount  + 1
+        #endTime=time.clock()
+        #diff = endTime - startTime
+        #if (diff > 1):
+        #    fps = frameCount
+        #    frameCount = 0
+        #    startTime = endTime
+
+        #TODO: only if sim    
+        key = cv2.waitKey(1) & 0xFF
+        if (key == 27 or key == ord('q') or key == ord('x')):
+            shutdownMavlinkUDP = True
+            shutdownMavlinkTCP = True
+            break
+
+#Shutdown
+UDPLinkQueue.join()
+TCPLinkQueue.join()
+if not UseSimulator:
+    cap.release()
+out.release()
+cv2.destroyAllWindows()
 
 
-    frameCount  = frameCount  + 1
-    endTime=time.clock()
-    diff = endTime - startTime
-    if (diff > 1):
-        fps = frameCount
-        frameCount = 0
-        startTime = endTime
-    
-    key = cv2.waitKey(1) & 0xFF
-    if (key == 27 or key == ord('q') or key == ord('x')):
-        shutdown = True
-        break
 
