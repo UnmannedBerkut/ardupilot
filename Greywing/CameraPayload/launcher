@@ -1,0 +1,5 @@
+#Script to run payload on startup
+#Add this to "Startup Applications"
+echo admin | sudo -S chmod +r /dev/ttyTHS1
+cd /home/greywing/Projects/CSCAPE/payload/
+python2 CameraPayload.py
