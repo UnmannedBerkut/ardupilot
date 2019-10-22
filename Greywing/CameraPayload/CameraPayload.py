@@ -113,10 +113,12 @@ else:   #for Nvidia Nano
     #Odroid Camera:
     #cap = cv2.VideoCapture('v4l2src device=/dev/video0 ! image/jpeg, width=(int)1920, height=(int)1080, framerate=(fraction)30/1 ! jpegdec ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
     #Lepoard Camera:
-    cap = cv2.VideoCapture('v4l2src device=/dev/video0 ! video/x-raw, format=(string)YUY2, width=(int)1920, height=(int)1080, framerate=(fraction)30/1 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+    #cap = cv2.VideoCapture('v4l2src device=/dev/video0 ! video/x-raw, format=(string)YUY2, width=(int)1920, height=(int)1080, framerate=(fraction)30/1 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+    #TODO: Figure out why ! videorate ! does not work in the output stream & remove videorate here so that it can run at full framerate
+    cap = cv2.VideoCapture('v4l2src device=/dev/video0 ! video/x-raw, format=(string)YUY2, width=(int)1920, height=(int)1080, framerate=(fraction)30/1 ! videoconvert ! videorate ! video/x-raw, framerate=(fraction)5/1 ! appsink', cv2.CAP_GSTREAMER)
 
     #Set output encoder to use hardware (Nvidia Nano)
-    H264_ENCODER = 'omxh264enc control-rate=2 bitrate=400000' #NOTE BITRATE (bps)
+    H264_ENCODER = 'omxh264enc control-rate=2 bitrate=50000' #NOTE BITRATE (bps)
 
    
 #Create Video Output Pipe
@@ -386,8 +388,9 @@ while(True):
 
 #Shutdown
 UDPLinkQueue.join()
-TCPLinkQueue.join()
-if not UseSimulator:
+if UseSimulator:
+    TCPLinkQueue.join()
+else:
     cap.release()
 out.release()
 cv2.destroyAllWindows()
