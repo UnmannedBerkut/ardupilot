@@ -1,27 +1,5 @@
 #Use Python 2.X
 
-#Use the following settings.json file (C:\Users\MyUser\Documents\AirSim)
-#{
-#  "SeeDocsAt": "https://github.com/Microsoft/AirSim/blob/master/docs/settings.md",
-#  "SettingsVersion": 1.2,
-#  "CameraDefaults": {
-#      "CaptureSettings": [
-#        {
-#          "ImageType": 0,
-#          "Width": 640,
-#          "Height": 480,
-#          "FOV_Degrees": 90,
-#          "AutoExposureSpeed": 100,
-#          "MotionBlurAmount": 0
-#        }
-#    ]
-#  },
-#  "SimMode": "ComputerVision",
-#  "LocalHostIp": "192.168.10.21"
-#}
-
-import airsim
-
 import time
 from pymavlink import mavutil
 import numpy
@@ -30,6 +8,8 @@ from threading import Thread
 from queue import Queue
 import pygeodesy
 import openCVUtils as util
+import socket
+from struct import *
 import pdb  #for debugging - use pdb.set_trace() to set breakpoints inside threads
 
 UseSimulator = True     #set to false for real flight   #TODO: make command line argument
@@ -37,15 +17,12 @@ UseSimulator = True     #set to false for real flight   #TODO: make command line
 #Settings:
 FMV_DESTINATION = '192.168.10.21'   #AKA: Downlink video destination
 FMV_PORT = '50006'
-MAVLINK_C2_GCS = 'udpout:192.168.10.21:50005'
+MAVLINK_C2_GCS = 'udpout:127.0.0.1:50005'
 CAMERA_FOV = 500             #(unitless) determined experimentally
 
 #Settings - Simulation only:
-AIRSIM_SERVER = '192.168.10.21'
-MAVLINK_HIGHSPEED_AUTOPILOT = 'tcp:192.168.10.10:5762'
-MAVLINK_C2_AUTOPILOT = 'tcp:192.168.10.10:5763'
-cameraType = airsim.ImageType.Scene         #EO color camera
-#cameraType = airsim.ImageType.Infrared     #Thermal Camera TODO: fix frame size in AirSim settings.json file
+MAVLINK_HIGHSPEED_AUTOPILOT = 'tcp:127.0.0.1:5762'
+MAVLINK_C2_AUTOPILOT = 'tcp:127.0.0.1:5763'
 
 #Mavlink C2 data
 hud_airspeed = 0.0    #pitot static airspeed (m/s)
@@ -67,13 +44,13 @@ waypoint_quantity = 0 #the number of known waypoints as reported by the autopilo
 shutdownMavlinkUDP = False
 shutdownMavlinkTCP = False
 
-#Simulation specific pose
-pitchSim = 0.0
-rollSim = 0.0
-yawSim = 0.0
-xSim = 0.0
-ySim = 0.0
-zSim = 0.0
+#Simulation specific high speed pose
+pitchSim = 0.0  #deg
+rollSim = 0.0   #deg    
+yawSim = 0.0    #deg true
+latSim = 0.0    #deg
+lonSim = 0.0    #deg
+altSim = 0.0    #meters msl?
 
 frameCount = 0
 startTime=time.clock()
@@ -95,14 +72,14 @@ def flightMode(i):
 #Check pipes using the command line first
 
 ## Set Video In / Out ##
-if UseSimulator:    #for Linux PC
-    #Video Input - from Airsim Server 
-    client = airsim.VehicleClient(AIRSIM_SERVER)
-    print("Waiting for AirSim Server") 
-    client.confirmConnection()
-    print("Connected to Airsim Server")
+if UseSimulator:
+    #create UDP socket to send pose information to Unity Visulization Simulaiton
+    unityPoseSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    client.simEnableWeather(True)   #Enable Dynamic Weather - optional
+    #TODO:    
+    #Create Gstreamer pipe to recieve video from Unity - MPEGTS H.264 format
+    #It will be something like: (for now we just internally generate a blank screen)
+    #cap = cv2.VideoCapture('udpsrc port=49410 ! application/x-rtp,encoding-name=H265,payload=96 ! rtph265depay ! h265parse ! queue ! avdec_h265 ! appsink', cv2.CAP_GSTREAMER)
 
     #Set output encoder to use software encoder    
     H264_ENCODER = 'x264enc bitrate=300 tune=zerolatency'   #NOTE BITRATE (kbps)   
@@ -122,7 +99,15 @@ else:   #for Nvidia Nano
 
    
 #Create Video Output Pipe
+#RTPH
 out = cv2.VideoWriter('appsrc ! videoconvert ! video/x-raw, format=(string)I420  ! videorate ! video/x-raw, framerate=(fraction)5/1 ! '+H264_ENCODER+' ! video/x-h264, stream-format=(string)byte-stream ! h264parse ! rtph264pay mtu=1400 ! udpsink host='+FMV_DESTINATION+' port='+FMV_PORT+' sync=false async=false', cv2.CAP_GSTREAMER,0,5,(640,480), True)
+
+#MPEGTS
+#To Display use > ffplay "udp://127.0.0.1:50006"
+#Note: Derate to 5FPS will provide for better quality, but there are issues with framerate sync
+#This framerate mismatch seemed to be ok with ffmpeg under MOCU
+#Radio Note: Freewave radios were tested to handle handle bitrate=300000 at 4M rate, at ~25dB margin
+#out = cv2.VideoWriter('appsrc ! videoconvert ! video/x-raw, format=(string)I420  ! videorate ! video/x-raw, framerate=(fraction)10/1 ! omxh264enc control-rate=2 bitrate=300000 ! video/x-h264, stream-format=(string)byte-stream ! mpegtsmux name=mux alignment=7 ! udpsink host=192.168.10.21 port=50006 sync=false', cv2.CAP_GSTREAMER,0,10,(640,480), True)
 
 #Error checking for output pipe only
 #TODO: Add error checking for input pipe
@@ -131,12 +116,13 @@ if (out.isOpened()):
 else:
     print("Output pipe Creation Failed")
 
-#Mavlink high speed link for driving Unreal sim pose
+#Mavlink high speed link for driving Unity sim pose
 #Not used if UseSimulator=False
 #Ardupilot setup:
 #Add SR1 rate setting to settings
 #Note: TCP 5762 = SR1 in settings
-# Use Mission planner to set in the meantime
+# Use Mission Planner (Win) or APM Planner (Linux) to set in the meantime
+# For APM planner - set file->Advanced Mode, then Communication->add link to set UDP 50005 (MAVLINK_C2_GCS above)
 # Set SR1 rates to be SR1_EXTRA1 = SR1_POSITION = 20
 # SR1_PARAMS = 10 (not entirely necessary)
 # Set other SR1 rates to zero
@@ -151,9 +137,9 @@ class MavlinkHighSpeedTCP(Thread):
         global pitchSim
         global rollSim
         global yawSim
-        global xSim
-        global ySim
-        global zSim
+        global latSim
+        global lonSim
+        global altSim
 
         m_network = mavutil.mavlink_connection(MAVLINK_HIGHSPEED_AUTOPILOT, planner_format=False, notimestamps=True, robust_parsing=True)
 
@@ -167,15 +153,16 @@ class MavlinkHighSpeedTCP(Thread):
             if mesg_s is not None:
                 #parse attitude message
                 if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_ATTITUDE):
-                    pitchSim = mesg_s.pitch
-                    rollSim = mesg_s.roll
-                    yawSim = mesg_s.yaw
-                    # print ("roll: ", roll, "ptch: ", pitch)
+                    pitchSim = mesg_s.pitch * 180 / 3.14
+                    rollSim = mesg_s.roll * 180 / 3.14
+                    yawSim = mesg_s.yaw * 180 / 3.14
+                    #print ("roll: ", roll, "ptch: ", pitch)
                 #parse posiiton message
-                if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_LOCAL_POSITION_NED):
-                    xSim = mesg_s.x 
-                    ySim = mesg_s.y 
-                    zSim = mesg_s.z
+                if (mesg_s.get_header().msgId == mavutil.ardupilotmega.MAVLINK_MSG_ID_GLOBAL_POSITION_INT):
+                    latSim = float(mesg_s.lat)/10000000.0
+                    lonSim = float(mesg_s.lon)/10000000.0
+                    altSim = float(mesg_s.alt)/1000.0
+                    #print latSim, lonSim, altSim    
 
         m_network.close()        
         print("Shutting down Mavlink high speed TCP link")
@@ -293,21 +280,16 @@ if UseSimulator:
 while(True):
 
     if UseSimulator:
-        #send pose to sim
-        client.simSetVehiclePose(airsim.Pose(airsim.Vector3r(xSim, ySim, zSim), airsim.to_quaternion(pitchSim, rollSim, yawSim)), True)
-        #set weather on the sim
-        #Note: These can also be changed on-the-fly via the weather UI in Unreal w/ the F10 key
-        #client.simSetWeatherParameter(airsim.WeatherParameter.Fog, 0)    #0.5 is a lot of fog
-        #client.simSetWeatherParameter(airsim.WeatherParameter.Rain, 0) #100 is max rain
+        #send high speed pose to visulization sim
+        message = pack('ffffff', latSim, lonSim, altSim, yawSim, -pitchSim, -rollSim)
+        server_address = ('127.0.0.1', 41234)
+        sent = unityPoseSocket.sendto(message, server_address)
 
-        #fetch image from sim
-        rawImage = client.simGetImage("0", cameraType)
-        if (rawImage == None):
-            print("Camera is not returning image, please check airsim for error messages")
-            continue    #TODO: fix this so the GCS downlink still works if no Arisim    
-        else:
-            #convert into a standard OpenCV image frame
-            image = cv2.imdecode(airsim.string_to_uint8_array(rawImage), cv2.IMREAD_UNCHANGED)
+        #TODO: read video stream from Visulization Sim using gstreamer pipe created earlier        
+        #this will likely be just:
+        #ret, image = cap.read()
+        #But... for now just create a blank image
+        image = numpy.zeros((480,640,4), numpy.uint8)
 
     else: #real flight
         #fetch image from gstreamer
@@ -316,6 +298,8 @@ while(True):
         image = image[0:1080, 240:1680]
         image = cv2.resize(image, (640,480), interpolation=cv2.INTER_AREA)
         
+    try: image
+    except: image = None
 
     if (image is not None):
         #draw center marker
