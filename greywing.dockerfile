@@ -13,7 +13,8 @@ RUN \
     cd /ardupilot/Tools/scripts/ && \
     bash install-prereqs-ubuntu.sh -y && \
     cd /ardupilot/ArduPlane/ && \
-    ../Tools/autotest/sim_vehicle.py -wD < /dev/null
+    ../Tools/autotest/sim_vehicle.py -wD < /dev/null && \
+    pip install pygeodesy transforms3d
 
 WORKDIR /ardupilot/ArduPlane
 
