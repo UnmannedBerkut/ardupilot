@@ -469,12 +469,21 @@ void SITL_State::_simulator_servos(SITL::Aircraft::sitl_input &input)
                 }
             } else {
                 // simulate simple battery setup
-                float throttle = motors_on?(input.servos[2]-1000) / 1000.0f:0;
-                // lose 0.7V at full throttle
-                voltage = _sitl->batt_voltage - 0.7f*fabsf(throttle);
+                float throttle = motors_on?(input.servos[2]-1000) / 1000.0f:0.0f;
 
-                // assume 50A at full throttle
-                _current = 50.0f * fabsf(throttle);
+                //*Greywing specific propulsion model*
+                //Note: Ardupilot support for a generalized motor model isin't great yet (see SIM_Motor.cpp)
+                //In the meantime, use this model for all aircraft
+                if (throttle < 0.553)   //Zero throttle (less is reverse thrust, not modeled)
+                    throttle = 0.553;
+                if (throttle > 0.74)    //max power
+                    throttle = 0.74;
+
+                // lose 0.7V at full throttle
+                voltage = _sitl->batt_voltage - 0.7f*throttle;
+
+                // 0.5A at idle, 6A level flight, 20A max
+                _current = 100.4f * throttle - 55.0f;
             }
         } else {
             // FDM provides voltage and current
