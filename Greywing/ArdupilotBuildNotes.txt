@@ -1,10 +1,12 @@
+Tested on Ubuntu 18.04.4
+Note: Unknown issues when building on Ubuntu 20.xx.xx
+
 Begin with: http://ardupilot.org/dev/docs/building-setup-linux.html
 
 checkout current SPAWARDev version (based on Arduplane-3.9.8)
 
-after cloning you will have to update the submodules by:
--using https instead of git by $ git config --global url."https://".insteadOf git://
--or updating submodules off the RDT&E network as git://github.com seems to be blocked
+update submodules:
+git submodule update --init --recursive
 
 Run the package installer script
 $ /ardupilot/Tools/scripts/install-prereqs-ubuntu.sh
