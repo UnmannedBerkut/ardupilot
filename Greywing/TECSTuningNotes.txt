@@ -7,8 +7,11 @@ TRIM_ARSPD_CM - dosen't affect tuning. This is the commanded airspeed when sendi
 
 *THR_MAX & THR_MIN - limts maximum commanded throttle in *all* but manual mode. Tunning effect: increacing the difference between these values (MAX-MIN) increaces Total Engergy -> throttle gain and throttle ff gain
 
+TECS_SPDWEIGHT - when 0 full priority to altitude control, when 2 full priority to aispeed control
+
 ARSPD_FBW_MAX & MIN - Sets limits for target airspeeds (airspeed demand), and stick airspeed commands in FBWA mode. No tuning effect
 Note!!: It is possible to send an airspeed command lower (but not higher) than this limit in Loit, Guided, and auto modes.
+If airspeed  < ARSPD_FBW_MAX*0.9 then underspeed triggered. Underspeed will temporarly set TECS_SPDWEIGHT=2.0 untill airspeed recovers.
 
 LIM_PITCH_MAX & MIN - Sets limits for pitch that can be commanded by TECS. No tuning effect
 
