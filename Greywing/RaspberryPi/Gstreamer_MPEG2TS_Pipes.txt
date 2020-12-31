@@ -1,6 +1,9 @@
 Mpeg2-TS stream: (use 224.1.1.1 for multicast)
 gst-launch-1.0 v4l2src ! 'video/x-raw, width=(int)160,height=(int)120,framerate=(fraction)5/1' ! avenc_h264_omx bitrate=50000 ! h264parse config-interval=2 ! mpegtsmux ! udpsink host=192.168.50.10 port=50000
 
+Very low bandwidth:
+gst-launch-1.0 v4l2src ! 'video/x-raw, width=(int)160,height=(int)120,framerate=(fraction)2/1' ! avenc_h264_omx bitrate=20000 ! h264parse config-interval=2 ! mpegtsmux ! udpsink host=192.168.50.10 port=50000
+
 windows decoder:
 gst-launch-1.0.exe udpsrc port=50000 ! tsdemux ! queue ! h264parse ! avdec_h264 ! autovideosink
 
