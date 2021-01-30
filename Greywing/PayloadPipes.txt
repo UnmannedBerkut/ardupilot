@@ -1,0 +1,13 @@
+greywing@greywing-nano:~/Projects/CSCAPE$ cat run1_5M
+gst-launch-1.0 v4l2src device=/dev/video0 ! 'video/x-raw, format=(string)YUY2, width=(int)1280, height=(int)720, framerate=(fraction)10/1' ! videoconvert ! videoscale ! 'video/x-raw, width=(int)320, height=(int)240' ! videorate ! 'video/x-raw, framerate=(fraction)10/1' ! omxh264enc control-rate=4 bitrate=150000 iframeinterval=4 ! 'video/x-h264, stream-format=(string)byte-stream' ! mpegtsmux name=mux alignment=7 ! udpsink host=192.168.10.21 port=50006 &
+
+python2 ./oldPayload/udpC2.py &
+greywing@greywing-nano:~/Projects/CSCAPE$ cat run4M
+gst-launch-1.0 v4l2src device=/dev/video0 ! 'video/x-raw, format=(string)YUY2, width=(int)1280, height=(int)720, framerate=(fraction)10/1' ! videoconvert ! videoscale ! 'video/x-raw, width=(int)640, height=(int)480' ! videorate ! 'video/x-raw, framerate=(fraction)10/1' ! omxh264enc control-rate=4 bitrate=400000 iframeinterval=4 ! 'video/x-h264, stream-format=(string)byte-stream' ! mpegtsmux name=mux alignment=7 ! udpsink host=192.168.10.21 port=50006 &
+
+python2 ./oldPayload/udpC2.py & 
+greywing@greywing-nano:~/Projects/CSCAPE$ cat run1_5M_test 
+gst-launch-1.0 filesrc location=SampleVideo.mp4 ! qtdemux ! queue max-size-time=0 ! avdec_h264 ! videorate ! 'video/x-raw, framerate=(fraction)2/1' ! omxh264enc control-rate=4 bitrate=150000 iframeinterval=4 ! 'video/x-h264, stream-format=(string)byte-stream' ! mpegtsmux name=mux alignment=7 ! udpsink host=192.168.10.21 port=50006
+greywing@greywing-nano:~/Projects/CSCAPE$ cat run4M_test 
+gst-launch-1.0 filesrc location=SampleVideo.mp4 ! qtdemux ! queue max-size-time=0 ! avdec_h264 ! videorate ! 'video/x-raw, framerate=(fraction)10/1' ! omxh264enc control-rate=4 bitrate=450000 iframeinterval=4 ! 'video/x-h264, stream-format=(string)byte-stream' ! mpegtsmux name=mux alignment=7 ! udpsink host=192.168.10.21 port=50006
+greywing@greywing-nano:~/Projects/CSCAPE$ 
